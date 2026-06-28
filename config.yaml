@@ -1,0 +1,109 @@
+# config.yaml
+# Hurricane Harvey (Aug 23 - Sep 2, 2017) flood forecasting — Harris County, TX
+# -----------------------------------------------------------------------------
+# Edit this file to change which gages/zones, storm window, or model settings
+# are used. Nothing else in the repo should need hardcoded values.
+
+storm:
+  name: "Hurricane Harvey"
+  hurdat2_id: "AL092017"            # NHC HURDAT2 storm identifier
+  # Window padded a few days before/after landfall so the model sees the
+  # rainfall ramp-up and the multi-day recession, not just the peak.
+  start: "2017-08-23T00:00:00Z"
+  end:   "2017-09-02T00:00:00Z"
+
+# Each "zone" = one USGS gage station standing in for a distinct watershed
+# personality in Harris County. Picked deliberately to contrast behavior:
+#   - buffalo_bayou: urban bayou, fast flashy response, downtown/west Houston
+#   - brays_bayou:   urban bayou, infamous for repeated residential flooding
+#                    (Meyerland / Texas Medical Center)
+#   - cypress_creek: rural/suburban creek, NW Harris Co., received some of
+#                    the single highest rainfall totals of Harvey
+#   - addicks_reservoir: flood-control reservoir, slow human-controlled
+#                    release rather than free-flowing channel — very
+#                    different dynamics from the other three
+#
+# NOTE on flood_stage_ft: these are placeholder/approximate values for
+# illustrating the modeling pipeline. Before using this for anything other
+# than a demo, verify exact action/minor/moderate/major flood stage
+# thresholds against NWS AHPS (water.weather.gov) for each site, since they
+# are set per-location by NWS and can be revised.
+zones:
+  - id: 0
+    name: "buffalo_bayou"
+    label: "Buffalo Bayou at Houston"
+    usgs_site: "08074500"
+    lat: 29.7588
+    lon: -95.3702
+    flood_stage_ft: 33.0          # placeholder — verify against NWS AHPS
+
+  - id: 1
+    name: "brays_bayou"
+    label: "Brays Bayou at Houston"
+    usgs_site: "08075000"
+    lat: 29.6997
+    lon: -95.4133
+    flood_stage_ft: 38.0          # placeholder — verify against NWS AHPS
+
+  - id: 2
+    name: "cypress_creek"
+    label: "Cypress Creek near Westfield"
+    usgs_site: "08068500"
+    lat: 30.0028
+    lon: -95.4172
+    flood_stage_ft: 96.0          # placeholder — verify against NWS AHPS
+
+  - id: 3
+    name: "addicks_reservoir"
+    label: "Addicks Reservoir near Addicks"
+    usgs_site: "08073000"
+    lat: 29.7847
+    lon: -95.6347
+    flood_stage_ft: 100.0         # placeholder — verify against NWS AHPS
+
+# USGS NWIS parameter codes pulled for every site above
+usgs_params:
+  gage_height: "00065"   # ft
+  discharge:   "00060"   # cubic ft/sec
+  precip:      "00045"   # inches (not all sites report this — see dataset.py)
+
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  resample_freq: "1h"          # all series resampled to hourly
+  synthetic_fallback: true     # if real download fails/unavailable, generate
+                                # clearly-labeled synthetic data so the
+                                # pipeline still runs end-to-end
+
+windows:
+  lookback_hours: 36           # how much history the model sees
+  horizon_hours: 12            # how far ahead it forecasts
+  stride_hours: 1              # step between consecutive training windows
+
+split:
+  # Time-based split per zone (not random) since this is a forecasting task.
+  # Train on the rainfall ramp-up and the early recession; validate/test on
+  # the remaining recession (still close enough to the peak to contain
+  # meaningful flood/no-flood label variance, rather than the fully-decayed
+  # tail of the storm window).
+  train_frac: 0.50
+  val_frac: 0.15
+  # remaining ~0.35 is test
+
+model:
+  rainfall_wind_dim: 2          # [rainfall_in_per_hr, wind_speed_mph]
+  zone_embed_dim: 8
+  hidden_size: 64
+  num_layers: 2
+  dropout: 0.2
+
+train:
+  batch_size: 64
+  epochs: 60
+  lr: 0.001
+  weight_decay: 0.00001
+  flood_loss_weight: 0.3        # weight of the BCE flood-exceedance head
+  seed: 42
+  checkpoint_path: "models/harvey_lstm.pt"
+
+device: "auto"   # "auto" picks cuda if available (e.g. Colab GPU runtime), else cpu
