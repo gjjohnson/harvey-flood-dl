@@ -1,0 +1,15 @@
+# Core
+torch>=2.2
+numpy>=1.26
+pandas>=2.2
+pyyaml>=6.0
+scikit-learn>=1.4
+matplotlib>=3.8
+requests>=2.31
+
+# Demo app
+gradio>=4.20
+
+# Colab already ships torch/numpy/pandas/sklearn/matplotlib pre-installed;
+# `pip install -r requirements.txt` will just no-op on those and install
+# gradio + pyyaml, which are not preinstalled.
